@@ -1,0 +1,11 @@
+version = 0.1
+
+[dev.deploy.parameters]
+stack_name = "quantum-motion-data-platform-iam"
+resolve_s3 = true
+s3_prefix = "quantum-motion-data-platform-iam"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+image_repositories = []

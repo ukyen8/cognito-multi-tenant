@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM template for a Multi-Tenant FastAPI application with Cognito.
+
+Globals:
+  Function:
+    Timeout: 30
+    Architectures:
+      - arm64
+    Layers:
+      - !Ref SharedLayer
+    Environment:
+      Variables:
+        LOG_LEVEL: !Ref LogLevel
+
+Parameters:
+  GatewayStageName:
+    Type: String
+    Default: "live"
+    Description: "API Gateway stage name"
+  LogLevel:
+    Type: String
+    Default: "INFO"
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARNING
+      - ERROR
+      - CRITICAL
+    Description: "Log level for the Lambda functions"
+  EnvironmentName:
+    Type: String
+    Default: "dev"
+    Description: "Environment name for the deployment"
+
+Resources:
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: shared-layer
+      Description: Shared dependencies for lambdas
+      ContentUri: ../layer/
+      CompatibleRuntimes:
+        - python3.13
+      RetentionPolicy: Delete
+
+  PlatformLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: main.handler
+      Role:
+        Fn::ImportValue: platform-lambda-role
+      MemorySize: 256
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref LogLevel
+          USER_POOL_ID: !Ref CognitoUserPool
+          APP_CLIENT_ID: !Ref CognitoUserPoolClient
+          ENVIRONMENT: !Ref EnvironmentName
+      Events:
+        # Auth Endpoints
+        GetAuthToken:
+          Type: Api
+          Properties:
+            Path: /api/v1/auth/token
+            Method: POST
+            RestApiId: !Ref PlatformAPIGateway
+        # Tenant Endpoints
+        CreateTenant:
+          Type: Api
+          Properties:
+            Path: /api/v1/tenants
+            Method: POST
+            RestApiId: !Ref PlatformAPIGateway
+        ListTenants:
+          Type: Api
+          Properties:
+            Path: /api/v1/tenants
+            Method: GET
+            RestApiId: !Ref PlatformAPIGateway
+        AddUserToTenant:
+          Type: Api
+          Properties:
+            Path: /api/v1/tenants/{tenant_id}/user
+            Method: POST
+            RestApiId: !Ref PlatformAPIGateway
+        # Notes Endpoints
+        CreateNote:
+          Type: Api
+          Properties:
+            Path: /api/v1/notes
+            Method: POST
+            RestApiId: !Ref PlatformAPIGateway
+        GetNote:
+          Type: Api
+          Properties:
+            Path: /api/v1/notes/{note_id}
+            Method: GET
+            RestApiId: !Ref PlatformAPIGateway
+        ListNotes:
+          Type: Api
+          Properties:
+            Path: /api/v1/notes
+            Method: GET
+            RestApiId: !Ref PlatformAPIGateway
+        # OpenAPI Docs
+        OpenAPIDoc:
+          Type: Api
+          Properties:
+            Path: /docs
+            Method: GET
+            RestApiId: !Ref PlatformAPIGateway
+        OpenAPIDocJson:
+          Type: Api
+          Properties:
+            Path: /openapi.json
+            Method: GET
+            RestApiId: !Ref PlatformAPIGateway
+      Runtime: python3.13
+
+  PlatformAPIGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref GatewayStageName
+      OpenApiVersion: 3.0.1
+      Name: PlatformApi
+      Auth:
+        UsagePlan:
+          CreateUsagePlan: PER_API
+
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: data-platform-user-pool
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      Schema:
+        - Name: tenant_id
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: data-platform-user-pool-client
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+  CognitoUserPoolGroupAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: ADMIN
+      UserPoolId: !Ref CognitoUserPool
+      Description: Tenant admin group for platform
+
+  CognitoUserPoolGroupEditor:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: EDITOR
+      UserPoolId: !Ref CognitoUserPool
+      Description: Tenant editor group for platform
+
+  CognitoUserPoolGroupViewer:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: VIEWER
+      UserPoolId: !Ref CognitoUserPool
+      Description: Tenant viewer group for platform
+
+Outputs:
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  CognitoUserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref CognitoUserPoolClient
+  PlatformLambdaArn:
+    Description: ARN of the Platform Lambda
+    Value: !GetAtt PlatformLambda.Arn
+    Export:
+      Name: platform-lambda-arn
