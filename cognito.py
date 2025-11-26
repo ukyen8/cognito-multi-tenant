@@ -58,7 +58,9 @@ def get_current_user(
 ROLES = {"admin", "editor", "viewer"}
 
 
-def require_role(required_roles: list[Role]) -> Callable[[dict], UserClaims]:
+def require_role(
+    required_roles: list[Role],
+) -> Callable[[UserClaims], UserClaims]:
     """Require user to have at least one of the specified roles.
 
     Args:
@@ -87,7 +89,9 @@ def require_role(required_roles: list[Role]) -> Callable[[dict], UserClaims]:
     return role_checker
 
 
-def get_cognito_client(settings: Settings = Depends(get_settings)) -> CognitoIdentityProviderClient:
+def get_cognito_client(
+    settings: Settings = Depends(get_settings),
+) -> CognitoIdentityProviderClient:
     return boto3.client(
         "cognito-idp",
         region_name=settings.region_name,

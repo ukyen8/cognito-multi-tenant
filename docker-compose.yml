@@ -1,0 +1,16 @@
+services:
+  cognito:
+    container_name: cognito-local
+    image: jagregory/cognito-local
+    networks:
+      - local-dev
+    ports:
+      - "9229:9229"
+    volumes:
+      - cognitodata:/app/.cognito  # Mount persistent data to correct path
+
+networks:
+  local-dev:
+
+volumes:
+  cognitodata: {}

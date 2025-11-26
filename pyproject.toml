@@ -15,3 +15,82 @@ dependencies = [
     "requests>=2.32.5",
     "uvicorn>=0.35.0",
 ]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "ruff>=0.14.6",
+    "taskipy>=1.14.1",
+]
+
+[tool.ruff]
+line-length = 79
+select = [
+    # flake8-builtins
+    "A",
+    # flake8-annotations
+    "ANN",
+    # flake8-bugbear
+    "B",
+    # flake8-comprehensions
+    "C4",
+    # pydocstyle
+    "D",
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # isort
+    "I",
+    # pep8-naming
+    "N",
+    # flake8-pytest-style
+    "PT",
+    # flake8-return
+    "RET",
+    # Ruff-specific rules
+    "RUF",
+    # flake8-bandit
+    "S",
+    # flake8-print
+    "T20",
+    # pyupgrade
+    "UP",
+    # pycodestyle
+    "W"
+]
+
+ignore  = [
+    # Missing type annotation for `self` in method
+    "ANN101",
+    # Missing type annotation for `cls` in method
+    "ANN102",
+    # Missing docstring in public <module|class|method|function>
+    "D1",
+    # Import block is un-sorted or un-formatted
+    "I001",
+    # Module shadows a Python standard-library module
+    "A005",
+    # Do not perform function call
+    "B008"
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+ignore_missing_imports = true
+plugins = [
+  "pydantic.mypy"
+]
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["*.dtos.*"]
+ignore_errors = true
+
+[tool.taskipy.tasks]
+ruff = "uv run python -m ruff check ."
+mypy = "uv run python -m mypy ."
+format = "uv run python -m ruff format"
+

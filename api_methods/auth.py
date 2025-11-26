@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 
-from aws_lambda_powertools import Logger
 from cognito import get_cognito_client
 from dtos.auth import TokenRequest, TokenResponse
 from settings import get_settings, Settings
+import logging
 
 router = APIRouter()
-logger = Logger()
+logger = logging.getLogger()
 
 
 @router.post("/auth/token", response_model=TokenResponse)

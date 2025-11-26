@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 
+from dtos.permissions import Role
+
 
 class UserClaims(BaseModel):
     """Represents the claims extracted from a Cognito JWT token."""
 
     email: str | None = Field(None, description="The user's email address")
-    cognito_groups: list[str] = Field(
+    cognito_groups: list[Role] = Field(
         default_factory=list,
         alias="cognito:groups",
         description="Cognito groups/roles for the user",
