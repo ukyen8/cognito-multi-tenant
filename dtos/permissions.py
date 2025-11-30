@@ -8,8 +8,3 @@ class Role(StrEnum):
     EDITOR = "EDITOR"
     VIEWER = "VIEWER"
 
-PERMISSION_SCORE = {
-    Role.ADMIN: 3,
-    Role.EDITOR: 2,
-    Role.VIEWER: 1
-}

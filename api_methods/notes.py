@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from dtos.auth import UserClaims
-from cognito import get_current_user
+from cognito import get_current_user, require_role
+from dtos.permissions import Role
 import uuid
 
 from dtos.note import Note, NoteCreateRequest
-from dtos.permissions import PERMISSION_SCORE
 
 router = APIRouter()
 
@@ -18,15 +18,17 @@ NOTES_DB: dict[str, list[Note]] = {}
 )
 def create_note(
     note_request: NoteCreateRequest,
-    user: UserClaims = Depends(get_current_user),
+    user: UserClaims = Depends(require_role([Role.EDITOR, Role.ADMIN])),
 ) -> Note:
-    """Create a new note within the user's tenant."""
+    """Create a new note within the user's tenant.
+
+    Requires EDITOR or ADMIN role.
+    """
     new_note = Note(
         note_id=str(uuid.uuid4()),
         tenant_id=user.tenant_id,
         user_id=user.user_id,
         content=note_request.content,
-        permission=user.cognito_groups[0]
     )
 
     if user.tenant_id not in NOTES_DB:
@@ -41,18 +43,16 @@ def get_note_by_id(
     note_id: str,
     user: UserClaims = Depends(get_current_user),
 ) -> Note:
-    """Retrieve a note by its ID."""
+    """Retrieve a note by its ID.
+
+    Accessible to all authenticated users in the tenant.
+    """
     tenant_notes = NOTES_DB.get(user.tenant_id, [])
     note = next((n for n in tenant_notes if n.note_id == note_id), None)
 
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
-        )
-    if PERMISSION_SCORE[user.cognito_groups[0]] < PERMISSION_SCORE[note.permission]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
         )
     return note
 
@@ -61,13 +61,38 @@ def get_note_by_id(
 def list_notes(
     user: UserClaims = Depends(get_current_user),
 ) -> list[Note]:
-    """List all notes for the user's tenant."""
+    """List all notes for the user's tenant.
+
+    Accessible to all authenticated users in the tenant.
+    """
     if user.tenant_id not in NOTES_DB:
         return []
 
-    all_notes = NOTES_DB.get(user.tenant_id)
-    notes = []
-    for note in all_notes:
-        if PERMISSION_SCORE[user.cognito_groups[0]] >= PERMISSION_SCORE[note.permission]:
-            notes.append(note)
-    return notes
+    return NOTES_DB.get(user.tenant_id, [])
+
+
+@router.delete("/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note(
+    note_id: str,
+    user: UserClaims = Depends(require_role([Role.ADMIN])),
+) -> None:
+    """Delete a note.
+
+    Requires ADMIN role.
+    """
+    if user.tenant_id not in NOTES_DB:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
+
+    tenant_notes = NOTES_DB[user.tenant_id]
+    note_index = next(
+        (i for i, n in enumerate(tenant_notes) if n.note_id == note_id), -1
+    )
+
+    if note_index == -1:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+        )
+
+    tenant_notes.pop(note_index)

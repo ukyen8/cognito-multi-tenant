@@ -8,7 +8,7 @@ class Note(BaseModel):
     tenant_id: str
     user_id: str
     content: str
-    permission: Role = Field(description="Permission for the note")
+
 
 
 class NoteCreateRequest(BaseModel):
